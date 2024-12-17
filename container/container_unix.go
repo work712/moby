@@ -4,8 +4,11 @@ package container // import "github.com/docker/docker/container"
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/containerd/continuity/fs"
@@ -16,6 +19,7 @@ import (
 	mounttypes "github.com/docker/docker/api/types/mount"
 	swarmtypes "github.com/docker/docker/api/types/swarm"
 	volumemounts "github.com/docker/docker/volume/mounts"
+	"github.com/docker/go-connections/nat"
 	"github.com/moby/sys/mount"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
@@ -277,6 +281,61 @@ func (container *Container) UpdateContainer(hostConfig *containertypes.HostConfi
 	}
 	if resources.CPUQuota > 0 && cResources.NanoCPUs > 0 {
 		return conflictingUpdateOptions("Conflicting options: CPU Quota cannot be updated as NanoCPUs has already been set")
+	}
+
+	if len(resources.DeviceRequests) > 0 {
+		var newDeviceRequests []containertypes.DeviceRequest
+		for i := range resources.DeviceRequests {
+			switch resources.DeviceRequests[i].Driver {
+			case "autodl-shm-size":
+				container.HostConfig.ShmSize = int64(resources.DeviceRequests[i].Count)
+			case "autodl-ports":
+				ports, portBindings, err := nat.ParsePortSpecs(resources.DeviceRequests[i].DeviceIDs)
+				fmt.Println("-----------------")
+				fmt.Println(fmt.Sprintf("update ports: %v %v %v", ports, portBindings, err))
+				fmt.Println("-----------------")
+				if err != nil {
+					fmt.Println(fmt.Sprintf("failed to parse port specs: %v, %s", resources.DeviceRequests[i].DeviceIDs, err))
+					continue
+				}
+				container.Config.ExposedPorts = ports
+				container.HostConfig.PortBindings = portBindings
+			default:
+				newDeviceRequests = append(newDeviceRequests, resources.DeviceRequests[i])
+			}
+		}
+		cResources.DeviceRequests = newDeviceRequests
+	}
+
+	if len(resources.Devices) > 0 {
+		var addDevices []containertypes.DeviceMapping
+
+		for _, v := range resources.Devices {
+			if strings.HasPrefix(v.PathOnHost, "/dev") {
+				addDevices = append(addDevices, v)
+				continue
+			}
+
+			// root path is not permit to mount
+			if len(v.PathInContainer) == 0 || v.PathOnHost == "/" {
+				continue
+			}
+			// if pathOnHost is nil, we'll delete this mount path in container
+			if len(v.PathOnHost) == 0 {
+				delete(container.MountPoints, v.PathInContainer)
+				continue
+			}
+			container.MountPoints[v.PathInContainer] = &volumemounts.MountPoint{
+				Source:      v.PathOnHost,
+				Destination: path.Clean(filepath.ToSlash(v.PathInContainer)),
+				RW:          strings.ToLower(v.CgroupPermissions) == "rw",
+				Type:        mounttypes.TypeBind,
+				Mode:        "",
+				Propagation: mounttypes.PropagationSlave,
+			}
+		}
+
+		container.HostConfig.Devices = addDevices
 	}
 
 	if resources.BlkioWeight != 0 {

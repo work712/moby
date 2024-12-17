@@ -160,7 +160,11 @@ all: build ## validate all checks, build linux binaries, run all tests,\ncross b
 	$(DOCKER_RUN_DOCKER) bash -c 'hack/validate/default && hack/make.sh'
 
 .PHONY: binary
+# set version number: make VERSION=20.10.17-umd18
 binary: bundles ## build statically linked linux binaries
+	echo $(VERSION_AUTOGEN_ARGS)
+	echo "last version: dockerd-20.10.7-deviceu"
+	echo $(VERSION)
 	$(BAKE_CMD) binary
 
 .PHONY: dynbinary
@@ -204,6 +208,7 @@ build: bundles
 
 .PHONY: shell
 shell: build  ## start a shell inside the build env
+#shell: ## start a shell inside the build env
 	$(DOCKER_RUN_DOCKER) bash
 
 .PHONY: test

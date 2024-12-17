@@ -47,6 +47,7 @@ RUN echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.con
 RUN apt-get update && apt-get install --no-install-recommends -y file
 ENV GO111MODULE=off
 ENV GOTOOLCHAIN=local
+ENV GOPROXY=https://goproxy.io
 
 FROM base AS criu
 ADD --chmod=0644 https://download.opensuse.org/repositories/devel:/tools:/criu/Debian_11/Release.key /etc/apt/trusted.gpg.d/criu.gpg.asc

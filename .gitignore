@@ -6,6 +6,7 @@
 *.orig
 .*.swp
 .DS_Store
+.idea
 thumbs.db
 
 # local repository customization

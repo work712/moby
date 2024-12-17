@@ -330,7 +330,7 @@ func (cli *DaemonCli) start(opts *daemonOptions) (err error) {
 		apiWG.Add(1)
 		go func(ls net.Listener) {
 			defer apiWG.Done()
-			log.G(ctx).Infof("API listen on %s", ls.Addr())
+			log.G(ctx).Infof("Docker api listen on %s", ls.Addr())
 			if err := httpServer.Serve(ls); err != http.ErrServerClosed {
 				log.G(ctx).WithFields(log.Fields{
 					"error":    err,
