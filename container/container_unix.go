@@ -291,15 +291,31 @@ func (container *Container) UpdateContainer(hostConfig *containertypes.HostConfi
 				container.HostConfig.ShmSize = int64(resources.DeviceRequests[i].Count)
 			case "autodl-ports":
 				ports, portBindings, err := nat.ParsePortSpecs(resources.DeviceRequests[i].DeviceIDs)
-				fmt.Println("-----------------")
+				fmt.Println("autodlLog...-----------------")
 				fmt.Println(fmt.Sprintf("update ports: %v %v %v", ports, portBindings, err))
-				fmt.Println("-----------------")
+				fmt.Println("autodlLog...-----------------")
 				if err != nil {
-					fmt.Println(fmt.Sprintf("failed to parse port specs: %v, %s", resources.DeviceRequests[i].DeviceIDs, err))
+					fmt.Println(fmt.Sprintf("autodlLog... failed to parse port specs: %v, %s", resources.DeviceRequests[i].DeviceIDs, err))
 					continue
 				}
 				container.Config.ExposedPorts = ports
 				container.HostConfig.PortBindings = portBindings
+			case "autodl-huawei-npu":
+				for k, v := range container.Config.Env {
+					if strings.HasPrefix(v, "ASCEND_VISIBLE_DEVICES") {
+						fmt.Println("autodlLog... delete env ASCEND_VISIBLE_DEVICES before reset", v)
+						container.Config.Env = append(container.Config.Env[:k], container.Config.Env[k+1:]...)
+						break
+					}
+				}
+
+				npuIDList := resources.DeviceRequests[i].Options["ASCEND_VISIBLE_DEVICES"]
+				if npuIDList != "" {
+					newNPUEnv := fmt.Sprintf("ASCEND_VISIBLE_DEVICES=%s", npuIDList)
+					fmt.Println("autodlLog... reset ASCEND_VISIBLE_DEVICES", newNPUEnv)
+					container.Config.Env = append(container.Config.Env, newNPUEnv)
+				}
+
 			default:
 				newDeviceRequests = append(newDeviceRequests, resources.DeviceRequests[i])
 			}
@@ -331,7 +347,7 @@ func (container *Container) UpdateContainer(hostConfig *containertypes.HostConfi
 				RW:          strings.ToLower(v.CgroupPermissions) == "rw",
 				Type:        mounttypes.TypeBind,
 				Mode:        "",
-				Propagation: mounttypes.PropagationSlave,
+				Propagation: mounttypes.PropagationRSlave,
 			}
 		}
 
