@@ -289,6 +289,7 @@ func (container *Container) UpdateContainer(hostConfig *containertypes.HostConfi
 			switch resources.DeviceRequests[i].Driver {
 			case "autodl-shm-size":
 				container.HostConfig.ShmSize = int64(resources.DeviceRequests[i].Count)
+
 			case "autodl-ports":
 				ports, portBindings, err := nat.ParsePortSpecs(resources.DeviceRequests[i].DeviceIDs)
 				fmt.Println("autodlLog...-----------------")
@@ -300,6 +301,7 @@ func (container *Container) UpdateContainer(hostConfig *containertypes.HostConfi
 				}
 				container.Config.ExposedPorts = ports
 				container.HostConfig.PortBindings = portBindings
+
 			case "autodl-huawei-npu":
 				for k, v := range container.Config.Env {
 					if strings.HasPrefix(v, "ASCEND_VISIBLE_DEVICES") {
@@ -313,6 +315,22 @@ func (container *Container) UpdateContainer(hostConfig *containertypes.HostConfi
 				if npuIDList != "" {
 					newNPUEnv := fmt.Sprintf("ASCEND_VISIBLE_DEVICES=%s", npuIDList)
 					fmt.Println("autodlLog... reset ASCEND_VISIBLE_DEVICES", newNPUEnv)
+					container.Config.Env = append(container.Config.Env, newNPUEnv)
+				}
+
+			case "autodl-mthreads":
+				for k, v := range container.Config.Env {
+					if strings.HasPrefix(v, "MTHREADS_VISIBLE_DEVICES") {
+						fmt.Println("autodlLog... delete env MTHREADS_VISIBLE_DEVICES before reset", v)
+						container.Config.Env = append(container.Config.Env[:k], container.Config.Env[k+1:]...)
+						break
+					}
+				}
+
+				npuIDList := resources.DeviceRequests[i].Options["MTHREADS_VISIBLE_DEVICES"]
+				if npuIDList != "" {
+					newNPUEnv := fmt.Sprintf("MTHREADS_VISIBLE_DEVICES=%s", npuIDList)
+					fmt.Println("autodlLog... reset MTHREADS_VISIBLE_DEVICES", newNPUEnv)
 					container.Config.Env = append(container.Config.Env, newNPUEnv)
 				}
 
